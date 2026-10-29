@@ -17,15 +17,15 @@
     <form id="form" novalidate>
       <section class="card">
         <h2><span class="step">1</span> Vídeo de referência</h2>
-        <p class="hint">O movimento e a câmera vêm deste vídeo. De 4 a 30 segundos (acima disso é cortado). MP4, MOV ou WebM.</p>
+        <p class="hint">O movimento e a câmera vêm deste vídeo. De <span id="min-seconds">3</span> a 30 segundos. MP4, MOV ou WebM.</p>
         <input type="file" id="video" accept="video/mp4,video/quicktime,video/webm" required>
         <video id="video-preview" controls muted playsinline hidden></video>
         <p id="video-info" class="hint"></p>
       </section>
 
       <section class="card">
-        <h2><span class="step">2</span> Fotos da modelo</h2>
-        <p class="hint">Rosto e corpo bem visíveis. JPG, PNG ou WebP, até <span id="max-images">8</span> fotos.</p>
+        <h2><span class="step">2</span> Foto da modelo</h2>
+        <p class="hint">Rosto e corpo bem visíveis. JPG, PNG ou WebP, <span id="max-images">1 foto</span>.</p>
         <input type="file" id="images" accept="image/jpeg,image/png,image/webp" multiple required>
         <div id="image-preview" class="thumbs"></div>
       </section>
@@ -35,9 +35,18 @@
         <label>Modelo
           <select id="model"></select>
         </label>
-        <label>Resolução
+        <label id="resolution-field">Resolução
           <select id="resolution"></select>
         </label>
+        <div id="kling-fields">
+          <label>Orientação do personagem
+            <select id="orientation">
+              <option value="video">Igual ao vídeo (vídeo de até 30 s)</option>
+              <option value="image">Igual à foto (vídeo de até 10 s)</option>
+            </select>
+          </label>
+          <label class="check"><input type="checkbox" id="keep-sound" checked> Manter o som do vídeo de referência</label>
+        </div>
         <label>Descrição (opcional)
           <textarea id="prompt" rows="3" maxlength="10000" placeholder="Ex.: mantenha a roupa da foto, iluminação de fim de tarde"></textarea>
         </label>

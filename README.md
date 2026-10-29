@@ -1,15 +1,16 @@
 # appvideo
 
-App para gerar vídeos com a API da [Higgsfield](https://cloud.higgsfield.ai). Por enquanto faz **motion control**: você envia um vídeo com o movimento e fotos da sua modelo, e a Higgsfield gera o mesmo vídeo com a sua modelo.
+App para gerar vídeos com a API da [Higgsfield](https://cloud.higgsfield.ai). Por enquanto faz **motion control**: você envia um vídeo com o movimento e uma foto da sua modelo, e a Higgsfield gera o mesmo vídeo com a sua modelo.
 
 ## Modelos
 
-| Modelo | Endpoint | Observação |
+| Modelo | Endpoint | Entradas |
 | --- | --- | --- |
-| Genjutsu Lite (padrão) | `higgsfield/genjutsu-light/motion-transfer/v1.0` | O mais barato (cerca de 1/3 do Genjutsu) |
-| Genjutsu | `higgsfield/genjutsu/motion-transfer/v1.0` | Qualidade maior |
+| Kling 2.6 Motion Control Standard (padrão, o mais barato) | `kling-video/motion-control/std` | `image_url` (1 foto), `video_url`, `prompt`, `keep_original_sound`, `character_orientation` |
+| Genjutsu Lite | `higgsfield/genjutsu-light/motion-transfer/v1.0` | `video_url`, `image_urls` (até 8 fotos), `resolution`, `prompt` |
+| Genjutsu | `higgsfield/genjutsu/motion-transfer/v1.0` | `video_url`, `image_urls` (até 8 fotos), `resolution`, `prompt` |
 
-Ambos recebem `video_url` (vídeo de 4 a 30 s; acima disso é cortado), `image_urls` (fotos da modelo), `resolution` e `prompt` (opcional). A duração do resultado segue a do vídeo de referência, e o custo também.
+No Kling, `character_orientation` define se a pose segue o vídeo (`video`, vídeo de até 30 s) ou a foto (`image`, vídeo de até 10 s). O custo depende da duração do vídeo de referência.
 
 ## Como rodar
 

@@ -50,7 +50,7 @@ test('exige a senha do app', async () => {
 test('config lista o modelo mais barato como padrão', async () => {
   const res = await fetch(`${base}/api/config`, { headers: auth });
   const body = await res.json();
-  assert.equal(body.defaultModel, 'higgsfield/genjutsu-light/motion-transfer/v1.0');
+  assert.equal(body.defaultModel, 'kling-video/motion-control/std');
   assert.equal(body.models[0].id, body.defaultModel);
 });
 
@@ -124,7 +124,12 @@ test('cria a geração e consulta o andamento', async () => {
   assert.deepEqual(calls.at(-1), {
     fn: 'submit',
     model: DEFAULT_MODEL,
-    input: { video_url: 'https://cdn.example.com/v.mp4', image_urls: ['https://cdn.example.com/a.jpg'], resolution: '720p' },
+    input: {
+      image_url: 'https://cdn.example.com/a.jpg',
+      video_url: 'https://cdn.example.com/v.mp4',
+      keep_original_sound: 'yes',
+      character_orientation: 'video',
+    },
   });
 
   const status = await fetch(`${base}/api/generations/req-123`, { headers: auth });
@@ -138,10 +143,41 @@ test('validateGeneration recusa entradas inválidas', () => {
   assert.throws(() => validateGeneration({ ...ok, model: 'outro' }), /Modelo inválido/);
   assert.throws(() => validateGeneration({ ...ok, videoUrl: 'http://x.com/v.mp4' }), /vídeo/);
   assert.throws(() => validateGeneration({ ...ok, imageUrls: [] }), /ao menos uma imagem/);
+  assert.throws(() => validateGeneration({ ...ok, imageUrls: [ok.imageUrls[0], ok.imageUrls[0]] }), /no máximo 1/);
+  assert.throws(() => validateGeneration({ ...ok, characterOrientation: 'lado' }), /Orientação inválida/);
+});
+
+test('validateGeneration monta os campos do Kling', () => {
+  const { model, input } = validateGeneration({
+    videoUrl: 'https://x.com/v.mp4',
+    imageUrls: ['https://x.com/a.jpg'],
+    prompt: ' dançando ',
+    keepOriginalSound: false,
+    characterOrientation: 'image',
+  });
+  assert.equal(model, 'kling-video/motion-control/std');
+  assert.deepEqual(input, {
+    image_url: 'https://x.com/a.jpg',
+    video_url: 'https://x.com/v.mp4',
+    keep_original_sound: 'no',
+    character_orientation: 'image',
+    prompt: 'dançando',
+  });
+});
+
+test('validateGeneration monta os campos do Genjutsu', () => {
+  const ok = {
+    model: 'higgsfield/genjutsu/motion-transfer/v1.0',
+    videoUrl: 'https://x.com/v.mp4',
+    imageUrls: ['https://x.com/a.jpg', 'https://x.com/b.jpg'],
+  };
   assert.throws(() => validateGeneration({ ...ok, imageUrls: Array(9).fill('https://x.com/a.jpg') }), /no máximo 8/);
-  assert.throws(() => validateGeneration({ ...ok, resolution: '480p' }), /Resolução inválida/);
-  const { input } = validateGeneration({ ...ok, prompt: ' dançando ' });
-  assert.equal(input.prompt, 'dançando');
+  assert.throws(() => validateGeneration({ ...ok, resolution: '4k' }), /Resolução inválida/);
+  assert.deepEqual(validateGeneration({ ...ok, resolution: '480p' }).input, {
+    video_url: 'https://x.com/v.mp4',
+    image_urls: ['https://x.com/a.jpg', 'https://x.com/b.jpg'],
+    resolution: '480p',
+  });
 });
 
 test('describeStatus nunca indica sucesso sem vídeo', () => {
@@ -152,6 +188,7 @@ test('describeStatus nunca indica sucesso sem vídeo', () => {
     assert.equal(r.videoUrl, undefined);
   }
   assert.equal(describeStatus({ status: 'completed' }).status, 'failed');
+  assert.match(describeStatus({ status: 'failed', error: 'imagem sem pessoa' }).message, /imagem sem pessoa/);
 });
 
 test('createHiggsfield envia arquivo e consulta status com a credencial só no cabeçalho', async () => {

@@ -22,6 +22,7 @@ async function init() {
   updateModelOptions();
 
   $('model').addEventListener('change', updateModelOptions);
+  $('orientation').addEventListener('change', describeVideo);
   $('video').addEventListener('change', previewVideo);
   $('images').addEventListener('change', previewImages);
   $('form').addEventListener('submit', generate);
@@ -44,7 +45,12 @@ function updateModelOptions() {
   const previous = select.value;
   select.replaceChildren(...model.resolucoes.map((r) => new Option(r, r)));
   if (model.resolucoes.includes(previous)) select.value = previous;
-  $('max-images').textContent = model.maxImagens;
+  $('resolution-field').hidden = model.resolucoes.length === 0;
+  $('kling-fields').hidden = model.tipo !== 'kling';
+  $('max-images').textContent = model.maxImagens === 1 ? '1 foto' : `até ${model.maxImagens} fotos`;
+  $('images').multiple = model.maxImagens > 1;
+  $('min-seconds').textContent = model.minSegundos;
+  describeVideo();
 }
 
 function previewVideo() {
@@ -58,11 +64,21 @@ function previewVideo() {
   preview.hidden = false;
   preview.onloadedmetadata = () => {
     videoDuration = preview.duration;
-    let info = `Duração: ${videoDuration.toFixed(1)} s`;
-    if (videoDuration < 4) info += ' — curto demais, o mínimo é 4 segundos.';
-    else if (videoDuration > 30) info += ' — só os primeiros 30 segundos serão usados.';
-    $('video-info').textContent = info;
+    describeVideo();
   };
+}
+
+function describeVideo() {
+  if (videoDuration === null) return;
+  const model = currentModel();
+  let info = `Duração: ${videoDuration.toFixed(1)} s`;
+  if (videoDuration < model.minSegundos) info += ` — curto demais, o mínimo é ${model.minSegundos} segundos.`;
+  else if (model.tipo === 'kling' && $('orientation').value === 'image' && videoDuration > 10) {
+    info += ' — com a orientação igual à foto, o máximo é 10 segundos.';
+  } else if (videoDuration > 30) {
+    info += model.tipo === 'kling' ? ' — longo demais, o máximo é 30 segundos.' : ' — só os primeiros 30 segundos serão usados.';
+  }
+  $('video-info').textContent = info;
 }
 
 function previewImages() {
@@ -86,12 +102,12 @@ async function generate(event) {
 
   const problem = !video
     ? 'Escolha o vídeo de referência.'
-    : videoDuration !== null && videoDuration < 4
-      ? 'O vídeo precisa ter pelo menos 4 segundos.'
+    : videoDuration !== null && videoDuration < model.minSegundos
+      ? `O vídeo precisa ter pelo menos ${model.minSegundos} segundos.`
       : images.length === 0
         ? 'Escolha ao menos uma foto da modelo.'
         : images.length > model.maxImagens
-          ? `Use no máximo ${model.maxImagens} fotos.`
+          ? (model.maxImagens === 1 ? 'Este modelo usa só 1 foto.' : `Use no máximo ${model.maxImagens} fotos.`)
           : tooLarge([video], 'video') || tooLarge(images, 'image');
   if (problem) return setStatus(problem, 'error');
 
@@ -113,8 +129,10 @@ async function generate(event) {
         model: model.id,
         videoUrl,
         imageUrls,
-        resolution: $('resolution').value,
+        resolution: $('resolution').value || undefined,
         prompt: $('prompt').value,
+        characterOrientation: $('orientation').value,
+        keepOriginalSound: $('keep-sound').checked,
       }),
     });
 

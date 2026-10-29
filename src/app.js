@@ -116,14 +116,26 @@ export function validateGeneration(body) {
   }
   if (!imageUrls.every(isHttpsUrl)) throw new HttpError(400, 'Imagem inválida.');
 
+  const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
+  if (prompt.length > 10000) throw new HttpError(400, 'Descrição longa demais.');
+
+  if (info.tipo === 'kling') {
+    const orientation = body?.characterOrientation ?? 'video';
+    if (!['video', 'image'].includes(orientation)) throw new HttpError(400, 'Orientação inválida.');
+    const input = {
+      image_url: imageUrls[0],
+      video_url: videoUrl,
+      keep_original_sound: body?.keepOriginalSound === false ? 'no' : 'yes',
+      character_orientation: orientation,
+    };
+    if (prompt) input.prompt = prompt;
+    return { model, input };
+  }
+
   const resolution = body?.resolution ?? info.resolucoes[0];
   if (!info.resolucoes.includes(resolution)) {
     throw new HttpError(400, `Resolução inválida para ${info.nome}.`);
   }
-
-  const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
-  if (prompt.length > 10000) throw new HttpError(400, 'Descrição longa demais.');
-
   const input = { video_url: videoUrl, image_urls: imageUrls, resolution };
   if (prompt) input.prompt = prompt;
   return { model, input };
@@ -140,8 +152,10 @@ export function describeStatus(result) {
     case 'completed':
       if (result.video?.url) return { status, done: true, videoUrl: result.video.url, message: 'Vídeo pronto!' };
       return { status: 'failed', done: true, message: 'A geração terminou, mas sem vídeo na resposta.' };
-    case 'failed':
-      return { status, done: true, message: 'A geração falhou (créditos devolvidos pela Higgsfield).' };
+    case 'failed': {
+      const reason = typeof result.error === 'string' && result.error ? `: ${result.error.slice(0, 300)}` : '';
+      return { status, done: true, message: `A geração falhou${reason}.` };
+    }
     case 'nsfw':
       return { status, done: true, message: 'Conteúdo barrado pela moderação (créditos devolvidos).' };
     case 'canceled':

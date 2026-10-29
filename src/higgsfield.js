@@ -6,16 +6,28 @@ export const API_URL = 'https://api.higgsfield.ai';
 
 // Modelos de motion control: o movimento do vídeo de referência é aplicado
 // à pessoa das imagens. O primeiro é o padrão (o mais barato).
+// tipo define os campos enviados à API (ver validateGeneration em src/app.js).
 export const MODELS = {
+  'kling-video/motion-control/std': {
+    nome: 'Kling 2.6 Standard (mais barato)',
+    tipo: 'kling',
+    maxImagens: 1,
+    resolucoes: [],
+    minSegundos: 3,
+  },
   'higgsfield/genjutsu-light/motion-transfer/v1.0': {
-    nome: 'Genjutsu Lite (mais barato)',
+    nome: 'Genjutsu Lite',
+    tipo: 'genjutsu',
     maxImagens: 8,
     resolucoes: ['720p', '1080p'],
+    minSegundos: 4,
   },
   'higgsfield/genjutsu/motion-transfer/v1.0': {
     nome: 'Genjutsu',
+    tipo: 'genjutsu',
     maxImagens: 8,
     resolucoes: ['480p', '720p', '1080p'],
+    minSegundos: 4,
   },
 };
 export const DEFAULT_MODEL = Object.keys(MODELS)[0];
