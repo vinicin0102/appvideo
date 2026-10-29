@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Motion Control</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Motion Control</h1>
+      <p>Envie um vídeo com o movimento e fotos da sua modelo. A Higgsfield gera o mesmo vídeo com a sua modelo.</p>
+    </header>
+
+    <form id="form" novalidate>
+      <section class="card">
+        <h2><span class="step">1</span> Vídeo de referência</h2>
+        <p class="hint">O movimento e a câmera vêm deste vídeo. De 4 a 30 segundos (acima disso é cortado). MP4, MOV ou WebM.</p>
+        <input type="file" id="video" accept="video/mp4,video/quicktime,video/webm" required>
+        <video id="video-preview" controls muted playsinline hidden></video>
+        <p id="video-info" class="hint"></p>
+      </section>
+
+      <section class="card">
+        <h2><span class="step">2</span> Fotos da modelo</h2>
+        <p class="hint">Rosto e corpo bem visíveis. JPG, PNG ou WebP, até <span id="max-images">8</span> fotos.</p>
+        <input type="file" id="images" accept="image/jpeg,image/png,image/webp" multiple required>
+        <div id="image-preview" class="thumbs"></div>
+      </section>
+
+      <section class="card">
+        <h2><span class="step">3</span> Opções</h2>
+        <label>Modelo
+          <select id="model"></select>
+        </label>
+        <label>Resolução
+          <select id="resolution"></select>
+        </label>
+        <label>Descrição (opcional)
+          <textarea id="prompt" rows="3" maxlength="10000" placeholder="Ex.: mantenha a roupa da foto, iluminação de fim de tarde"></textarea>
+        </label>
+      </section>
+
+      <button type="submit" id="submit">Gerar vídeo</button>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+    </form>
+
+    <section class="card" id="history-card" hidden>
+      <h2>Seus vídeos</h2>
+      <ul id="history"></ul>
+    </section>
+  </main>
+</body>
+</html>

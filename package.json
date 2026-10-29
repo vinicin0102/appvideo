@@ -1,0 +1,18 @@
+{
+  "name": "appvideo",
+  "version": "1.0.0",
+  "description": "Gera vídeos com a API da Higgsfield: motion control (o movimento de um vídeo aplicado à sua modelo)",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "dependencies": {
+    "@higgsfield/client": "^0.2.6"
+  }
+}
