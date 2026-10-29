@@ -5,6 +5,14 @@ import { createHiggsfield, DEFAULT_MODEL } from '../src/higgsfield.js';
 
 const calls = [];
 const fakeHf = {
+  async createUpload(contentType) {
+    calls.push({ fn: 'createUpload', contentType });
+    return {
+      uploadUrl: 'https://storage.example.com/put',
+      publicUrl: 'https://cdn.example.com/direct',
+      headers: { 'Content-Type': contentType, 'Content-Length': '10' },
+    };
+  },
   async upload(data, contentType) {
     calls.push({ fn: 'upload', size: data.length, contentType });
     return `https://cdn.example.com/${calls.length}`;
@@ -66,6 +74,39 @@ test('envio de arquivo valida o formato e devolve a URL', async () => {
   assert.equal(ok.status, 200);
   assert.match((await ok.json()).url, /^https:\/\/cdn\.example\.com\//);
   assert.deepEqual(calls.at(-1), { fn: 'upload', size: 10, contentType: 'video/mp4' });
+});
+
+test('endereço de envio direto valida o arquivo e omite cabeçalhos proibidos', async () => {
+  const post = (body) => fetch(`${base}/api/upload-url`, {
+    method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  assert.equal((await post({ kind: 'video', contentType: 'video/avi', size: 10 })).status, 415);
+  assert.equal((await post({ kind: 'image', contentType: 'image/png', size: 16 * 1024 * 1024 })).status, 413);
+  assert.equal((await post({ kind: 'image', contentType: 'image/png', size: 0 })).status, 400);
+
+  const ok = await post({ kind: 'video', contentType: 'video/mp4', size: 10 });
+  assert.equal(ok.status, 200);
+  assert.deepEqual(await ok.json(), {
+    uploadUrl: 'https://storage.example.com/put',
+    publicUrl: 'https://cdn.example.com/direct',
+    headers: { 'Content-Type': 'video/mp4' },
+  });
+});
+
+test('sem configuração a página abre, mas a API avisa o que falta', async () => {
+  const broken = createApp({ hf: null, password: '', setupError: 'Defina HF_CREDENTIALS.' });
+  await new Promise((resolve) => broken.listen(0, '127.0.0.1', resolve));
+  const url = `http://127.0.0.1:${broken.address().port}`;
+  try {
+    assert.equal((await fetch(`${url}/`)).status, 200);
+    const config = await (await fetch(`${url}/api/config`)).json();
+    assert.equal(config.setupError, 'Defina HF_CREDENTIALS.');
+    const gen = await fetch(`${url}/api/generations`, { method: 'POST', body: '{}' });
+    assert.equal(gen.status, 503);
+    assert.deepEqual(await gen.json(), { error: 'Defina HF_CREDENTIALS.' });
+  } finally {
+    broken.close();
+  }
 });
 
 test('cria a geração e consulta o andamento', async () => {

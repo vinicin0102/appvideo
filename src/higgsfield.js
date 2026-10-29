@@ -47,24 +47,33 @@ export function createHiggsfield(credentials, { fetch = globalThis.fetch } = {})
     return body;
   }
 
+  // Pede um endereço temporário para enviar um arquivo ao armazenamento da
+  // Higgsfield. O envio em si (PUT) não leva a credencial.
+  async function createUpload(contentType) {
+    const slot = await api('/files/generate-upload-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content_type: contentType }),
+    });
+    if (!slot.upload_url || !slot.public_url) {
+      throw new HiggsfieldFailure('A Higgsfield não devolveu o endereço de envio do arquivo.');
+    }
+    return {
+      uploadUrl: slot.upload_url,
+      publicUrl: slot.public_url,
+      headers: slot.upload_headers ?? { 'Content-Type': contentType },
+    };
+  }
+
   return {
-    // Envia um arquivo para o armazenamento da Higgsfield e devolve a URL pública.
+    createUpload,
+
+    // Envia o arquivo pelo servidor e devolve a URL pública.
     async upload(data, contentType) {
-      const slot = await api('/files/generate-upload-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content_type: contentType }),
-      });
-      if (!slot.upload_url || !slot.public_url) {
-        throw new HiggsfieldFailure('A Higgsfield não devolveu o endereço de envio do arquivo.');
-      }
-      const put = await fetch(slot.upload_url, {
-        method: 'PUT',
-        headers: slot.upload_headers ?? { 'Content-Type': contentType },
-        body: data,
-      });
+      const slot = await createUpload(contentType);
+      const put = await fetch(slot.uploadUrl, { method: 'PUT', headers: slot.headers, body: data });
       if (!put.ok) throw new HiggsfieldFailure(`Falha ao enviar o arquivo (HTTP ${put.status}).`);
-      return slot.public_url;
+      return slot.publicUrl;
     },
 
     // Cria o pedido de geração sem esperar terminar; o andamento vem de status().

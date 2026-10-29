@@ -22,7 +22,7 @@ const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',
   'Content-Security-Policy':
-    "default-src 'self'; img-src 'self' blob: https:; media-src 'self' blob: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+    "default-src 'self'; img-src 'self' blob: https:; media-src 'self' blob: https:; connect-src 'self' https:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
 };
 
 class HttpError extends Error {
@@ -32,9 +32,11 @@ class HttpError extends Error {
   }
 }
 
-// hf: objeto com upload(), submit() e status() (src/higgsfield.js).
+// hf: objeto com createUpload(), upload(), submit() e status() (src/higgsfield.js).
 // password: se definida, todo o app exige login (usuário qualquer + essa senha).
-export function createApp({ hf, password }) {
+// setupError: configuração faltando; a página abre e mostra o aviso, mas a API
+// não gera nada até ser corrigida.
+export function createApp({ hf, password, setupError = '' }) {
   return http.createServer(async (req, res) => {
     try {
       if (password && !authorized(req, password)) {
@@ -42,7 +44,7 @@ export function createApp({ hf, password }) {
         return res.end('Login necessário.');
       }
       const url = new URL(req.url, 'http://localhost');
-      if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url, hf);
+      if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url, hf, setupError);
       if (req.method !== 'GET' && req.method !== 'HEAD') throw new HttpError(405, 'Método não permitido.');
       await serveStatic(res, url.pathname);
     } catch (err) {
@@ -53,20 +55,28 @@ export function createApp({ hf, password }) {
   });
 }
 
-async function handleApi(req, res, url, hf) {
+async function handleApi(req, res, url, hf, setupError) {
   if (url.pathname === '/api/config' && req.method === 'GET') {
     const models = Object.entries(MODELS).map(([id, m]) => ({ id, ...m }));
-    return sendJson(res, 200, { models, defaultModel: DEFAULT_MODEL, uploads: UPLOAD_TYPES });
+    return sendJson(res, 200, { models, defaultModel: DEFAULT_MODEL, uploads: UPLOAD_TYPES, setupError });
+  }
+  if (setupError) throw new HttpError(503, setupError);
+
+  // Endereço para o navegador enviar o arquivo direto à Higgsfield, sem passar
+  // pelo servidor (na Vercel, o servidor só recebe até 4,5 MB por requisição).
+  if (url.pathname === '/api/upload-url' && req.method === 'POST') {
+    const body = parseJson(await readBody(req, 4 * 1024));
+    const { contentType } = checkUpload(body?.kind, body?.contentType);
+    if (!Number.isInteger(body?.size) || body.size <= 0) throw new HttpError(400, 'Arquivo vazio.');
+    if (body.size > UPLOAD_TYPES[body.kind].maxBytes) throw new HttpError(413, tooBig(UPLOAD_TYPES[body.kind].maxBytes));
+    const slot = await hf.createUpload(contentType);
+    return sendJson(res, 200, { ...slot, headers: browserHeaders(slot.headers) });
   }
 
+  // Alternativa: o arquivo passa pelo servidor (usada se o navegador não
+  // conseguir enviar direto).
   if (url.pathname === '/api/upload' && req.method === 'POST') {
-    const kind = url.searchParams.get('kind');
-    const rule = UPLOAD_TYPES[kind];
-    if (!rule) throw new HttpError(400, 'Tipo de envio inválido.');
-    const contentType = (req.headers['content-type'] ?? '').split(';')[0].trim().toLowerCase();
-    if (!rule.types.includes(contentType)) {
-      throw new HttpError(415, `Formato não aceito. Use: ${rule.types.join(', ')}.`);
-    }
+    const { rule, contentType } = checkUpload(url.searchParams.get('kind'), req.headers['content-type']);
     const data = await readBody(req, rule.maxBytes);
     if (data.length === 0) throw new HttpError(400, 'Arquivo vazio.');
     const publicUrl = await hf.upload(data, contentType);
@@ -140,6 +150,22 @@ export function describeStatus(result) {
     default:
       return { status: 'unknown', done: true, message: `Status inesperado da Higgsfield: ${String(status)}.` };
   }
+}
+
+function checkUpload(kind, rawType) {
+  const rule = UPLOAD_TYPES[kind];
+  if (!rule) throw new HttpError(400, 'Tipo de envio inválido.');
+  const contentType = String(rawType ?? '').split(';')[0].trim().toLowerCase();
+  if (!rule.types.includes(contentType)) {
+    throw new HttpError(415, `Formato não aceito. Use: ${rule.types.join(', ')}.`);
+  }
+  return { rule, contentType };
+}
+
+// O navegador não deixa definir alguns cabeçalhos (ele mesmo os calcula).
+const FORBIDDEN_HEADERS = new Set(['content-length', 'host', 'connection', 'transfer-encoding']);
+function browserHeaders(headers) {
+  return Object.fromEntries(Object.entries(headers ?? {}).filter(([k]) => !FORBIDDEN_HEADERS.has(k.toLowerCase())));
 }
 
 function isHttpsUrl(value) {

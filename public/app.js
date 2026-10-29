@@ -27,6 +27,10 @@ async function init() {
   $('form').addEventListener('submit', generate);
 
   renderHistory();
+  if (config.setupError) {
+    $('submit').disabled = true;
+    return setStatus(config.setupError, 'error');
+  }
   for (const item of loadHistory()) if (!item.done) poll(item.id);
 }
 
@@ -130,13 +134,27 @@ function tooLarge(files, kind) {
   return big ? `"${big.name}" passa de ${Math.round(max / 1024 / 1024)} MB.` : '';
 }
 
+// Envia direto ao armazenamento da Higgsfield. Se o navegador bloquear o envio
+// direto, tenta pelo servidor (que na Vercel só aceita arquivos até 4,5 MB).
 async function upload(file, kind) {
-  const { url } = await api(`/api/upload?kind=${kind}`, {
+  const slot = await api('/api/upload-url', {
     method: 'POST',
-    headers: { 'Content-Type': file.type },
-    body: file,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind, contentType: file.type, size: file.size }),
   });
-  return url;
+  let put;
+  try {
+    put = await fetch(slot.uploadUrl, { method: 'PUT', headers: slot.headers, body: file });
+  } catch {
+    const { url } = await api(`/api/upload?kind=${kind}`, {
+      method: 'POST',
+      headers: { 'Content-Type': file.type },
+      body: file,
+    });
+    return url;
+  }
+  if (!put.ok) throw new Error(`Falha ao enviar "${file.name}" (HTTP ${put.status}).`);
+  return slot.publicUrl;
 }
 
 async function poll(id) {
@@ -163,6 +181,7 @@ async function poll(id) {
 async function api(path, options) {
   const res = await fetch(path, options);
   const data = await res.json().catch(() => ({}));
+  if (res.status === 413 && !data.error) throw new Error('Arquivo grande demais para enviar pelo servidor.');
   if (!res.ok) throw new Error(data.error || `Erro ${res.status}.`);
   return data;
 }

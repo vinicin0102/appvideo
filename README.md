@@ -33,9 +33,18 @@ Abra http://localhost:3000.
 
 **Cada geração é cobrada pela Higgsfield.** Se colocar o app na internet, defina `APP_PASSWORD`.
 
+## Na Vercel
+
+Em **Settings → Environment Variables** do projeto, crie:
+
+- `HF_CREDENTIALS`: sua chave da Higgsfield (`key-id:key-secret`).
+- `APP_PASSWORD`: senha para abrir o app (obrigatória na Vercel).
+
+Depois faça um novo deploy (**Deployments → ⋯ → Redeploy**). Enquanto faltar alguma delas, a página abre e mostra o aviso, mas não gera vídeos.
+
 ## Como funciona
 
-1. O navegador envia o vídeo e as fotos para o servidor (`POST /api/upload`), que os repassa ao armazenamento da Higgsfield (`/files/generate-upload-url`) e devolve a URL pública.
+1. O servidor pede à Higgsfield um endereço temporário de envio (`POST /api/upload-url` → `/files/generate-upload-url`), e o navegador envia o vídeo e as fotos direto para lá. Se o navegador bloquear o envio direto, o arquivo passa pelo servidor (`POST /api/upload`); na Vercel esse caminho só aceita arquivos até 4,5 MB.
 2. O servidor cria o pedido com o `subscribe` do SDK oficial `@higgsfield/client` (`POST /api/generations`), sem esperar terminar.
 3. A página consulta o andamento a cada 5 segundos (`GET /api/generations/:id` → `/requests/{id}/status`). Só mostra o vídeo quando o status é `completed` e há URL; falha, moderação (`nsfw`) e cancelamento aparecem como erro.
 
